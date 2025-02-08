@@ -1,11 +1,15 @@
 module AES where
 
+import Prelude hiding (round)
+
 import Data.List (foldl')
 import Data.Bits (Bits(rotateL, xor, shiftL))
 import Data.Word (Word8, Word16, Word32)
 
 import Util
 import GF
+
+import Debug.Trace
 
 -- | This AES's fixed polynomial, found in the standard, 4.2.
 -- | x^8 + x^4 + x^3 + x + 1
@@ -48,7 +52,8 @@ subByte = affine . inv'
 
   
 mixColumns :: [Word32] -> [Word32]
-mixColumns state = unmatrify . transpose $ map mix (transpose . matrify $ state)
+mixColumns state =
+  map bytesToWord $ transpose $ map mix $ transpose $ map wordToBytes state
 
 mix :: [Word8] -> [Word8]
 mix [a, b, c, d] =
@@ -105,12 +110,28 @@ expandKey key
               nxt' = nxt `xor` (ek !! (i - nk))
            in (nxt', ek ++ [nxt'])
 
-ekStdExample :: [Word32]
-ekStdExample = map bytesToWord e
+addRoundKey :: [Word32] -> [Word32] -> [Word32]
+addRoundKey kr state = zipWith xor state (matrify kr)
+
+round :: [Word32] -> [Word32] -> [Word32]
+round rk = addRoundKey rk . mixColumns . shiftRows . subBytes
+
+roundLast :: [Word32] -> [Word32] -> [Word32]
+roundLast rk = addRoundKey rk . shiftRows . subBytes
+
+encrypt_ :: [Word32] -> [Word32] -> [Word32]
+encrypt_ plain ek = go (addRoundKey (take 4 ek) (matrify plain)) (drop 4 ek) 1
   where
-    e =
-      [ [0x2b, 0x7e, 0x15, 0x16]
-      , [0x28, 0xae, 0xd2, 0xa6]
-      , [0xab, 0xf7, 0x15, 0x88]
-      , [0x09, 0xcf, 0x4f, 0x3c]
-      ]
+    go state ek 10 = matrify $ roundLast ek state
+    go state ek i = go (round (take 4 ek) state) (drop 4 ek) (i + 1)
+
+encrypt :: String -> String -> String
+encrypt plain key =
+  toString
+    $ concatMap wordToBytes (encrypt_ (wordify plain) (expandKey (wordify key)))
+  where
+    wordify [] = []
+    wordify s
+      | length s `mod` 8 == 0 =
+        bytesToWord (toBytes (take 8 s)) : wordify (drop 8 s)
+      | otherwise = unreachable
