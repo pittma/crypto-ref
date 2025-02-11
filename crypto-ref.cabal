@@ -18,11 +18,13 @@ common warnings
 library
     import:           warnings
     exposed-modules:
-        XTS
         AES
+        AES.Encrypt
+        AES.Decrypt
         GF
         Util
     other-modules:
+        AES.Shared
     -- other-extensions:
     build-depends:
         base ^>=4.17.2.1,

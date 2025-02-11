@@ -37,6 +37,9 @@ printHex = printf "0x%08x"
 traceState :: [Word32] -> [Word32]
 traceState state = trace (show $ map printHex state) state
 
+showState :: [Word32] -> String
+showState state = toString $ concatMap wordToBytes (matrify state)
+
 toBytes :: String -> [Word8]
 toBytes (a:b:r) = read ("0x" ++ [a, b]) : toBytes r
 toBytes [] = []
@@ -44,3 +47,10 @@ toBytes [_] = unreachable
 
 toString :: [Word8] -> String
 toString = concatMap (printf "%02x")
+
+wordify :: String -> [Word32]
+wordify [] = []
+wordify s
+  | length s `mod` 8 == 0 =
+    bytesToWord (toBytes (take 8 s)) : wordify (drop 8 s)
+  | otherwise = unreachable
