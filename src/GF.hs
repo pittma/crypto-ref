@@ -15,8 +15,9 @@ inv m a = go m a 0 1
        in go r1 r t t'
   
 multGF :: (Bits b, Num b) => b -> b -> b
-multGF a b = go a b 0 8
+multGF x y = go x y 0 8
   where
+    go :: (Bits b, Num b) => b -> b -> b -> b -> b
     go _ _ p 0 = p
     go a b p i =
       let p' =
@@ -31,7 +32,7 @@ multGF a b = go a b 0 8
   
 degree :: (Bits b, Num b) => b -> Int
 degree 0 = 0
-degree x = go x 0
+degree a = go a 0
   where
     go x r
       | x == 1 = r
@@ -39,7 +40,7 @@ degree x = go x 0
 
 
 blq :: (Bits b, Num b) => b -> b -> (b, b)
-blq x y = go x y 0
+blq a b = go a b 0
   where
     go x y q
       | degree x < degree y = (q, x)

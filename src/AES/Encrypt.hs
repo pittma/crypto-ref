@@ -49,7 +49,9 @@ roundLast :: [Word32] -> [Word32] -> [Word32]
 roundLast rk = addRoundKey rk . shiftRows . subBytes
 
 encrypt_ :: [Word32] -> [Word32] -> [Word32]
-encrypt_ plain ek = go (addRoundKey (take 4 ek) (matrify plain)) (drop 4 ek) 1
+encrypt_ plain expandedKey =
+  go (addRoundKey (take 4 expandedKey) (matrify plain)) (drop 4 expandedKey) 1
   where
+    go :: [Word32] -> [Word32] -> Int -> [Word32]
     go state ek 10 = matrify $ roundLast ek state
     go state ek i = go (round (take 4 ek) state) (drop 4 ek) (i + 1)
