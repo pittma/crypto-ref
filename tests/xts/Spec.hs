@@ -9,11 +9,11 @@ import Util
 import XTS
 
 data CryptData = CData
-  { key1 :: [Word8]
-  , key2 :: [Word8]
-  , tweak :: [Word8]
-  , plain :: [Word8]
-  , cipher :: [Word8]
+  { key1 :: ![Word8]
+  , key2 :: ![Word8]
+  , tweak :: ![Word8]
+  , plain :: ![Word8]
+  , cipher :: ![Word8]
   }
 
 testVectors :: [CryptData]
@@ -93,6 +93,27 @@ testVectors =
                 , "bb140f2e583cb2ad15b4aa5b655016a8449277dbd477ef2c8d6c017db738b18d"
                 , "eb4a427d1923ce3ff262735779a418f20a282df920147beabe421ee5319d0568"
                 ]
+      }
+  , CData
+      { key1 = toBytes "fffefdfcfbfaf9f8f7f6f5f4f3f2f1f0"
+      , key2 = toBytes "bfbebdbcbbbab9b8b7b6b5b4b3b2b1b0"
+      , tweak = toBytes "9a785634120000000000000000000000"
+      , plain = toBytes "000102030405060708090a0b0c0d0e0f10"
+      , cipher = toBytes "6c1625db4671522d3d7599601de7ca09ed"
+      }
+  , CData
+      { key1 = toBytes "fffefdfcfbfaf9f8f7f6f5f4f3f2f1f0"
+      , key2 = toBytes "bfbebdbcbbbab9b8b7b6b5b4b3b2b1b0"
+      , tweak = toBytes "9a785634120000000000000000000000"
+      , plain = toBytes "000102030405060708090a0b0c0d0e0f101112"
+      , cipher = toBytes "e5df1351c0544ba1350b3363cd8ef4beedbf9d"
+      }
+  , CData
+      { key1 = toBytes "fffefdfcfbfaf9f8f7f6f5f4f3f2f1f0"
+      , key2 = toBytes "bfbebdbcbbbab9b8b7b6b5b4b3b2b1b0"
+      , tweak = toBytes "9a785634120000000000000000000000"
+      , plain = toBytes "000102030405060708090a0b0c0d0e0f10111213"
+      , cipher = toBytes "9d84c813f719aa2c7be3f66171c7c5c2edbf9dac"
       }
   ]
 
