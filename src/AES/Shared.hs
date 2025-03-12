@@ -32,7 +32,7 @@ columnTrans mixf state =
   map bytesToWord $ transpose $ map mixf $ transpose $ map wordToBytes state
 
 addRoundKey :: [Word32] -> [Word32] -> [Word32]
-addRoundKey kr state = zipWith xor state (matrify kr)
+addRoundKey rk state = zipWith xor state (matrify rk)
 
 rcon :: Int -> Word32
 rcon i = shiftL (go i) 24

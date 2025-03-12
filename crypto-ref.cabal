@@ -21,6 +21,7 @@ library
         AES
         AES.Encrypt
         AES.Decrypt
+        CFB
         GF
         Util
         XTS
