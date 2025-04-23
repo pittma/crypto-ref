@@ -46,11 +46,39 @@ coordsToOffsets_ = 0 : map snd (sortOn fst $ go (0, 1) 0)
     go (x, y) i = ((x, y), offset_ 8 i) : go (coords_ x y) (i + 1) 
 
 rho :: (Bits w, Integral w) => [[w]] -> [[w]]
-rho state =
-  let offsets = coordsToOffsets_
-   in outer offsets state
+rho = outer coordsToOffsets_
   where
     outer _ [] = []
     outer (a:b:c:d:e:off) (s:st) =
       zipWith rotateL s [a, b, c, d, e] : outer off st
     outer _ _ = unreachable
+
+pi :: [[w]] -> [[w]]
+pi [] = []
+pi state = go 0
+  where
+    go 5 = []
+    go i =
+      [ state !! (mkX 0 i) !! 0
+      , state !! (mkX 1 i) !! 1
+      , state !! (mkX 2 i) !! 2
+      , state !! (mkX 3 i) !! 3
+      , state !! (mkX 4 i) !! 4
+      ]
+        : go (i + 1)
+    mkX x y = (x + (3 * y)) `mod` 5
+
+chiTrans_ :: (Bits w) => [[w]] -> Int -> Int -> w
+chiTrans_ state x y =
+  let a = state !! x !! y
+      a1 = state !! ((x + 1) `mod` 5) !! y
+      a2 = state !! ((x + 2) `mod` 5) !! y
+   in a `xor` (complement a1 .&. a2)
+
+chi :: (Bits w) => [[w]] -> [[w]]
+chi state = outer state 0
+  where
+    outer _ 5 = []
+    outer st x = inner st x 0 : outer st (x + 1)
+    inner _ _ 5 = []
+    inner st' x y = chiTrans_ st' x y : inner st' x (y + 1)
