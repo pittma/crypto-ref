@@ -25,6 +25,7 @@ library
         GF
         Util
         XTS
+        Shake
     other-modules:
         AES.Shared
     -- other-extensions:
