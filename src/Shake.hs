@@ -1,6 +1,7 @@
 module Shake where
 
 import Data.Bits
+import Data.Word
 import Data.List (sortOn)
 
 import Util
@@ -82,3 +83,31 @@ chi state = outer state 0
     outer st x = inner st x 0 : outer st (x + 1)
     inner _ _ 5 = []
     inner st' x y = chiTrans_ st' x y : inner st' x (y + 1)
+
+rc1_ :: (Bits w, Num w) => w -> w
+rc1_ state =
+  if state .&. 0x80 /= 0
+    then (state `shiftL` 1) `xor` 0x71
+    else state `shiftL` 1
+
+rcx_ :: (Bits w, Num w) => w -> Int -> w
+rcx_ state 0 = state
+rcx_ state i = rcx_ (rc1_ state) (i - 1)
+
+rc_ :: (Bits w, Num w) => Int -> Int -> w
+rc_ l = go 1 1 0
+  where
+    go :: (Bits w, Num w) => w -> Int -> w -> Int -> w
+    go state j out r
+      | j == l = out
+      | otherwise =
+        let s = rcx_ state (j + (7 * r))
+            o =
+              if s .&. 0x01 /= 0
+                then o `xor` ((1 `shiftL` j) - 1)
+                else o
+         in go s (j + 1) o r
+
+iota :: (Bits w, Num w) => [[w]] -> Int -> Int -> [[w]]
+iota ((i:inner):outer) l rnd = (i `xor` rc_ rnd l : inner) : outer
+iota _ _ _ = unreachable
