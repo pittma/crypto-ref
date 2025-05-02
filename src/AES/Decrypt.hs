@@ -78,8 +78,8 @@ invRound kr = invMixColumns . addRoundKey kr . invSubBytes . invShiftRows
 invRoundLast :: [Word32] -> [Word32] -> [Word32]
 invRoundLast kr = addRoundKey kr . invSubBytes . invShiftRows
 
-decrypt_ :: [Word32] -> [Word32] -> [Word32]
-decrypt_ ciphert expandedKey =
+decrypt_ :: Int -> [Word32] -> [Word32] -> [Word32]
+decrypt_ rnd ciphert expandedKey =
   let ekl = length expandedKey
    in go
         (addRoundKey (drop (ekl - 4) expandedKey) (matrify ciphert))
@@ -88,10 +88,11 @@ decrypt_ ciphert expandedKey =
         (ekl - 4)
   where
     go :: [Word32] -> [Word32] -> Int -> Int -> [Word32]
-    go state ek 10 _ = matrify $ invRoundLast ek state
-    go state ek i ekl =
-      go
-        (invRound (drop (ekl - 4) ek) state)
-        (take (ekl - 4) ek)
-        (i + 1)
-        (ekl - 4)
+    go state ek i ekl
+      | i == rnd = matrify $ invRoundLast ek state
+      | otherwise =
+        go
+          (invRound (drop (ekl - 4) ek) state)
+          (take (ekl - 4) ek)
+          (i + 1)
+          (ekl - 4)

@@ -126,7 +126,7 @@ main =
   where
     vecTest :: CryptData -> IO ()
     vecTest vec = do
-      encrypt (key1 vec) (key2 vec) (plain vec) (tweak vec)
+      encrypt128 (key1 vec) (key2 vec) (plain vec) (tweak vec)
         `shouldBe` cipher vec
-      decrypt (key1 vec) (key2 vec) (cipher vec) (tweak vec)
+      decrypt128 (key1 vec) (key2 vec) (cipher vec) (tweak vec)
         `shouldBe` plain vec
