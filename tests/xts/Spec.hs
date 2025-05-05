@@ -121,7 +121,7 @@ main :: IO ()
 main =
   hspec $ do
     describe "XTS encrypt" $ do
-      it "should correctly encrypt the test vectors from the standard" $ do
+      it "should correctly round trip the test vectors from the standard" $ do
         forM_ testVectors vecTest
   where
     vecTest :: CryptData -> IO ()
