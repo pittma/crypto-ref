@@ -22,7 +22,6 @@ irrPolyDeg = 8
 constC :: Word8
 constC = 0x63
 
-
 inv' :: Word8 -> Word8
 inv' 0 = 0
 inv' a = fromIntegral $ inv irrPoly (fromIntegral a)

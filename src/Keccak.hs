@@ -5,7 +5,7 @@ import Data.Bits
 import Data.List (sortOn)
 import Data.Word
 
-import Util hiding (matrify)
+import Util
 
 -- | XOR sheets, where a sheet is the nth item in each inner
 -- | array.
@@ -50,7 +50,7 @@ coordsToOffsets_ w = 0 : map snd (sortOn fst (map swap (gen (1, 0) 0)))
 
 rho :: Int -> [[Word64]] -> [[Word64]]
 rho width state =
-  matrify $ zipWith rotateL (concat state) (coordsToOffsets_ width) 
+  matrify_ $ zipWith rotateL (concat state) (coordsToOffsets_ width) 
                 
 
 pi :: [[Word64]] -> [[Word64]]
@@ -117,18 +117,18 @@ iota _ _ _ = unreachable
 rnd :: Int -> Int -> Int -> [[Word64]] -> [[Word64]]
 rnd l width i = iota l i . chi . pi . rho width . theta
 
-matrify :: [w] -> [[w]]
-matrify s = (go s)
+matrify_ :: [w] -> [[w]]
+matrify_ s = go s
   where
     go [] = []
     go (s1:s2:s3:s4:s5:ss) = [s1, s2, s3, s4, s5] : go ss
     go _ = unreachable
 
-unmatrify :: [[Word64]] -> [Word64]
-unmatrify s = concat (s)
+unmatrify_ :: [[Word64]] -> [Word64]
+unmatrify_ s = concat (s)
 
 keccak_f :: Int -> Int -> [Word64] -> [Word64]
-keccak_f l width input = unmatrify $ run 0 (matrify input)
+keccak_f l width input = unmatrify_ $ run 0 (matrify_ input)
   where
     run r s
       | r == (12 + (2 * l) - 1) = rnd l width r s
