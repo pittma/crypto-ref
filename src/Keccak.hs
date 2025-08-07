@@ -127,12 +127,67 @@ matrify_ s = go s
 unmatrify_ :: [[Word64]] -> [Word64]
 unmatrify_ s = concat (s)
 
-keccak_f :: Int -> Int -> [Word64] -> [Word64]
-keccak_f l width input = unmatrify_ $ run 0 (matrify_ input)
+keccak_p :: Int -> Int -> [Word64] -> [Word64]
+keccak_p l width input = unmatrify_ $ run 0 (matrify_ input)
   where
     run r s
       | r == (12 + (2 * l) - 1) = rnd l width r s
       | otherwise = run (r + 1) (rnd l width r s)
 
-keccak :: [Word64] -> [Word64]
-keccak = keccak_f 6 64
+toWord64 :: [Word8] -> [Word64]
+toWord64 bytes = go (map fromIntegral bytes)
+  where
+    go (w1:w2:w3:w4:w5:w6:w7:w8:rest) =
+      (w1 `shiftL` 56
+         .|. w2 `shiftL` 48
+         .|. w3 `shiftL` 40
+         .|. w4 `shiftL` 32
+         .|. w5 `shiftL` 24
+         .|. w6 `shiftL` 16
+         .|. w7 `shiftL` 8
+         .|. w8)
+        : go rest
+    go [] = []
+    go _ = unreachable
+
+fromWord64 :: [Word64] -> [Word8]
+fromWord64 = concatMap f
+  where
+    f word =
+      map
+        fromIntegral
+        [ word `shiftR` 56
+        , word `shiftR` 48
+        , word `shiftR` 40
+        , word `shiftR` 32
+        , word `shiftR` 24
+        , word `shiftR` 16
+        , word `shiftR` 8
+        , word
+        ]
+
+keccak_f1600 :: [Word64] -> [Word64]
+keccak_f1600 = keccak_p 6 64
+
+pad101 :: Int -> Int -> [Word8]
+pad101 x m =
+  let pad = (x - (m `mod` x))
+   in [0x80] ++ replicate (pad - 2) 0 ++ [0x1]
+
+keccak :: [Word8] -> Int -> [Word64]
+keccak n d =
+  let a = absorb (replicate 25 0) (toWord64 (n ++ pad101 72 (length n)))
+   in squeeze a d (take 72 a)
+  where
+    absorb state n' =
+      let state' =
+            zipWith xor state (keccak_f1600 (take 9 n' ++ replicate 16 0))
+       in absorb state' (drop 9 n')
+    squeeze st outl z
+      | outl <= length z = take outl z
+      | otherwise =
+        let st' = keccak_f1600 st
+         in squeeze st' outl (z ++ take 72 st')
+
+sha3_512 :: [Word8] -> [Word64]
+sha3_512 input = keccak input (512 `div` 8)

@@ -71,4 +71,4 @@ main =
         map (\x -> mkRC_ 6 x 0) [0 .. 23] `shouldBe` theKnownRCs
     describe "the keccak implementation" $ do
       it "should generate the correct hash for the zero vector" $ do
-        keccak (replicate 25 0) `shouldBe` theZeroVectorHash
+        keccak_f1600 (replicate 25 0) `shouldBe` theZeroVectorHash
