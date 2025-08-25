@@ -35,22 +35,22 @@ theta3_ is cols = map (zipWith xor cols) is
 theta :: [[Word64]] -> [[Word64]]
 theta state = theta3_ state $ theta2_ $ theta1_ state
 
-offset_ :: Int -> Int -> Int
-offset_ w t = ((t + 1) * (t + 2) `div` 2) `mod` w
+offset_ :: Int -> Int
+offset_ t = ((t + 1) * (t + 2) `div` 2) `mod` 64
 
 coords_ :: Int -> Int -> (Int, Int)
 coords_ x y = (y, ((2 * x) + (3 * y)) `mod` 5)
 
-coordsToOffsets_ :: Int -> [Int]
-coordsToOffsets_ w = 0 : map snd (sortOn fst (map swap (gen (1, 0) 0)))
+coordsToOffsets_ :: [Int]
+coordsToOffsets_ = 0 : map snd (sortOn fst (map swap (gen (1, 0) 0)))
   where
     gen _ 24 = []
-    gen (x, y) i = ((x, y), offset_ w i) : gen (coords_ x y) (i + 1)
+    gen (x, y) i = ((x, y), offset_ i) : gen (coords_ x y) (i + 1)
     swap ((x, y), o) = ((y, x), o)
 
-rho :: Int -> [[Word64]] -> [[Word64]]
-rho width state =
-  matrify_ $ zipWith rotateL (concat state) (coordsToOffsets_ width) 
+rho :: [[Word64]] -> [[Word64]]
+rho state =
+  matrify_ $ zipWith rotateL (concat state) (coordsToOffsets_) 
                 
 
 pi :: [[Word64]] -> [[Word64]]
@@ -98,11 +98,11 @@ rc_ count
   | count == 0 = True
   | otherwise = lfsr_ count 1
 
-mkRC_ :: Int -> Int -> Word64 -> Word64
-mkRC_ log2 rd rc = go 0 rd rc
+mkRC_ :: Int -> Word64 -> Word64
+mkRC_ rd rc = go 0 rd rc
   where
     go j r rc
-      | j == log2 + 1 = rc
+      | j == 7 = rc
       | otherwise =
         let rc' =
               if rc_ (j + (7 * r))
@@ -110,12 +110,12 @@ mkRC_ log2 rd rc = go 0 rd rc
                 else rc
          in go (j + 1) r rc'
   
-iota :: Int -> Int -> [[Word64]] -> [[Word64]]
-iota log2 round ((i:inner):outer) = (i `xor` mkRC_ log2 round 0 : inner) : outer
-iota _ _ _ = unreachable
+iota :: Int -> [[Word64]] -> [[Word64]]
+iota round ((i:inner):outer) = (i `xor` mkRC_ round 0 : inner) : outer
+iota _ _ = unreachable
 
-rnd :: Int -> Int -> Int -> [[Word64]] -> [[Word64]]
-rnd l width i = iota l i . chi . pi . rho width . theta
+rnd :: Int -> [[Word64]] -> [[Word64]]
+rnd i = iota i . chi . pi . rho . theta
 
 matrify_ :: [w] -> [[w]]
 matrify_ s = go s
@@ -127,12 +127,12 @@ matrify_ s = go s
 unmatrify_ :: [[Word64]] -> [Word64]
 unmatrify_ s = concat (s)
 
-keccak_p :: Int -> Int -> [Word64] -> [Word64]
-keccak_p l width input = unmatrify_ $ run 0 (matrify_ input)
+keccak_p :: [Word64] -> [Word64]
+keccak_p input = unmatrify_ $ run 0 (matrify_ input)
   where
     run r s
-      | r == (12 + (2 * l) - 1) = rnd l width r s
-      | otherwise = run (r + 1) (rnd l width r s)
+      | r == (12 + (2 * 6) - 1) = rnd r s
+      | otherwise = run (r + 1) (rnd r s)
 
 toWord64 :: [Word8] -> [Word64]
 toWord64 bytes = go (map fromIntegral bytes)
@@ -166,28 +166,22 @@ fromWord64 = concatMap f
         , word
         ]
 
-keccak_f1600 :: [Word64] -> [Word64]
-keccak_f1600 = keccak_p 6 64
-
 pad101 :: Int -> Int -> [Word8]
 pad101 x m =
   let pad = (x - (m `mod` x))
    in [0x80] ++ replicate (pad - 2) 0 ++ [0x1]
 
-keccak :: [Word8] -> Int -> [Word64]
-keccak n d =
-  let a = absorb (replicate 25 0) (toWord64 (n ++ pad101 72 (length n)))
-   in squeeze a d (take 72 a)
-  where
-    absorb state n' =
-      let state' =
-            zipWith xor state (keccak_f1600 (take 9 n' ++ replicate 16 0))
-       in absorb state' (drop 9 n')
-    squeeze st outl z
-      | outl <= length z = take outl z
-      | otherwise =
-        let st' = keccak_f1600 st
-         in squeeze st' outl (z ++ take 72 st')
-
-sha3_512 :: [Word8] -> [Word64]
-sha3_512 input = keccak input (512 `div` 8)
+-- sponge :: [Word8] -> Int -> [Word64]
+-- sponge n d =
+--   let a = absorb (replicate 25 0) (toWord64 (n ++ pad101 72 (length n)))
+--    in squeeze a d (take 72 a)
+--   where
+--     absorb state n' =
+--       let state' =
+--             zipWith xor state (keccak_f1600 (take 9 n' ++ replicate 16 0))
+--        in absorb state' (drop 9 n')
+--     squeeze st outl z
+--       | outl <= length z = take outl z
+--       | otherwise =
+--         let st' = keccak_f1600 st
+--          in squeeze st' outl (z ++ take 72 st')

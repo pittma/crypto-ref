@@ -68,7 +68,7 @@ main =
   hspec $ do
     describe "the Round Constant generator" $ do
       it "should generate the correct round constants" $ do
-        map (\x -> mkRC_ 6 x 0) [0 .. 23] `shouldBe` theKnownRCs
+        map (\x -> mkRC_ x 0) [0 .. 23] `shouldBe` theKnownRCs
     describe "the keccak implementation" $ do
       it "should generate the correct hash for the zero vector" $ do
-        keccak_f1600 (replicate 25 0) `shouldBe` theZeroVectorHash
+        keccak_p (replicate 25 0) `shouldBe` theZeroVectorHash
