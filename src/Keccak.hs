@@ -127,11 +127,19 @@ matrify_ s = go s
 unmatrify_ :: [[Word64]] -> [Word64]
 unmatrify_ s = concat (s)
 
-keccak_p :: [Word64] -> [Word64]
-keccak_p input = unmatrify_ $ run 0 (matrify_ input)
+-- KECCAK-p as specified is a family of functions KECCAK-p[b, nr](S)
+-- where nr is number of rounds and b is the but length of the output
+-- string. A practical implementation however, is fixed s.t. nr = 24,
+-- and b is 5x5x64, or 1600.
+--
+-- Therefore, for the purposes of this implementation, I elided nr and
+-- b as parameters leaving its only input to be S, the string to be
+-- hashed.
+keccakP :: [Word64] -> [Word64]
+keccakP input = unmatrify_ $ run 0 (matrify_ input)
   where
     run r s
-      | r == (12 + (2 * 6) - 1) = rnd r s
+      | r == 23 = rnd r s
       | otherwise = run (r + 1) (rnd r s)
 
 toWord64 :: [Word8] -> [Word64]
@@ -166,22 +174,53 @@ fromWord64 = concatMap f
         , word
         ]
 
+-- A sponge is a family of functions SPONGE[f, pad, r](N, d) s.t. f is
+-- the mixing function. pad is the padding function, and r is the
+-- rate. See the spec for more on r.
+--
+-- Think of the sponge like an AES mode to KECCAK-p's (f more
+-- generally) AES. KECCAK-p is a block hash, the sponge allows us to
+-- apply the block hash iteratively to an arbitrarily long string.
+--
+-- N is our input string, and d is the length of the output hash.
+sponge :: ([Word64] -> [Word64]) -> (Int -> Int -> [Word8]) -> Int -> [Word8] -> Int -> [Word64]
+sponge f pad r n d =
+      -- rate and capacity adjusted for quadwords. Recall that 1600
+      -- bits is derived from 5x5x64 (5x5 quadwords).
+  let qwr = r `div` 8
+      qwc = 25 - qwr
+      a = absorb qwr qwc (replicate 25 0) (toWord64 (n ++ pad r (length n)))
+   in squeeze qwr a d (take r a)
+  where
+    absorb _ _ state [] = state
+    absorb qwr qwc state n' =
+      let state' =
+            zipWith xor state (f (take qwr n' ++ replicate qwc 0))
+       in absorb r qwc state' (drop qwr n')
+    squeeze qwr st outl z
+      | outl <= length z = take outl z
+      | otherwise =
+        let st' = f st
+         in squeeze qwr st' outl (z ++ take qwr st')
+
 pad101 :: Int -> Int -> [Word8]
 pad101 x m =
   let pad = (x - (m `mod` x))
    in [0x80] ++ replicate (pad - 2) 0 ++ [0x1]
 
--- sponge :: [Word8] -> Int -> [Word64]
--- sponge n d =
---   let a = absorb (replicate 25 0) (toWord64 (n ++ pad101 72 (length n)))
---    in squeeze a d (take 72 a)
---   where
---     absorb state n' =
---       let state' =
---             zipWith xor state (keccak_f1600 (take 9 n' ++ replicate 16 0))
---        in absorb state' (drop 9 n')
---     squeeze st outl z
---       | outl <= length z = take outl z
---       | otherwise =
---         let st' = keccak_f1600 st
---          in squeeze st' outl (z ++ take 72 st')
+-- KECCAK is specified with bits in mind, but in the real world we
+-- have to work with bytes. I'm torn here on how to write down its
+-- API, but I opted to write it as specified and resolve the bits ->
+-- bytes divide-by-8 issue before we reach the sponge. This allows us
+-- not only to define KECCAK as specified (API-wise), but also the
+-- SHA3 functions.
+--
+-- SO KEEP IN MIND THEN, that c is IN BITS.
+keccak :: Int -> [Word8] -> Int -> [Word64]
+keccak c n d = sponge keccakP pad101 ((1600 - c) `div` 8) n (d `div` 8)
+
+sha3 :: [Word8] -> Int -> Int -> [Word64]
+sha3 m c = keccak c (m ++ [0x01])
+
+sha3_512 :: [Word8] -> [Word64]
+sha3_512 m = sha3 m 1024 512
