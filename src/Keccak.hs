@@ -144,14 +144,14 @@ toWord64 :: [Word8] -> [Word64]
 toWord64 bytes = go (map fromIntegral bytes)
   where
     go (w1:w2:w3:w4:w5:w6:w7:w8:rest) =
-      (w1 `shiftL` 56
-         .|. w2 `shiftL` 48
-         .|. w3 `shiftL` 40
-         .|. w4 `shiftL` 32
-         .|. w5 `shiftL` 24
-         .|. w6 `shiftL` 16
-         .|. w7 `shiftL` 8
-         .|. w8)
+      (w8 `shiftL` 56
+         .|. w7 `shiftL` 48
+         .|. w6 `shiftL` 40
+         .|. w5 `shiftL` 32
+         .|. w4 `shiftL` 24
+         .|. w3 `shiftL` 16
+         .|. w2 `shiftL` 8
+         .|. w1)
         : go rest
     go [] = []
     go _ = unreachable
@@ -162,14 +162,14 @@ fromWord64 = concatMap f
     f word =
       map
         fromIntegral
-        [ word `shiftR` 56
-        , word `shiftR` 48
-        , word `shiftR` 40
-        , word `shiftR` 32
-        , word `shiftR` 24
-        , word `shiftR` 16
+        [ word
         , word `shiftR` 8
-        , word
+        , word `shiftR` 16
+        , word `shiftR` 24
+        , word `shiftR` 32
+        , word `shiftR` 40
+        , word `shiftR` 48
+        , word `shiftR` 56
         ]
 
 -- A sponge is a family of functions SPONGE[f, pad, r](N, d) s.t. f is
@@ -195,11 +195,11 @@ sponge f pad r n d
   let qwr = r `div` 8
       qwc = 25 - qwr
       a = absorb qwr qwc (replicate 25 0) (toWord64 (n ++ pad r (length n)))
-   in squeeze qwr a d (take qwr a)
+   in squeeze qwr a (d `div` 8) (take qwr a)
   where
     absorb _ _ state [] = state
     absorb qwr qwc state n' =
-      let state' = zipWith xor state (f (take qwr n' ++ replicate qwc 0))
+      let state' = f (zipWith xor state (take qwr n' ++ replicate qwc 0))
        in absorb r qwc state' (drop qwr n')
     squeeze qwr st outl z
       | outl <= length z = take outl z
@@ -224,8 +224,8 @@ keccak :: Word8 -> Int -> [Word8] -> Int -> [Word64]
 keccak dom c n d =
   sponge keccakP (pad101 dom) ((1600 - c) `div` 8) n (d `div` 8)
 
-sha3 :: [Word8] -> Int -> Int -> [Word64]
-sha3 m c = keccak 0x06 c m
+sha3 :: [Word8] -> Int -> Int -> String
+sha3 m c d = toString $ fromWord64 (keccak 0x06 c m d)
 
-sha3_512 :: [Word8] -> [Word64]
+sha3_512 :: [Word8] -> String
 sha3_512 m = sha3 m 1024 512
