@@ -1,4 +1,5 @@
 module Keccak where
+
 import Prelude hiding (pi, round)
 
 import Data.Bits
@@ -49,9 +50,7 @@ coordsToOffsets_ = 0 : map snd (sortOn fst (map swap (gen (1, 0) 0)))
     swap ((x, y), o) = ((y, x), o)
 
 rho :: [[Word64]] -> [[Word64]]
-rho state =
-  matrify_ $ zipWith rotateL (concat state) (coordsToOffsets_) 
-                
+rho state = matrify_ $ zipWith rotateL (concat state) (coordsToOffsets_)
 
 pi :: [[Word64]] -> [[Word64]]
 pi [] = []
@@ -83,7 +82,6 @@ chi state = outer state 0
     inner _ _ 5 = []
     inner st' x y = chiTrans_ st' y x : inner st' x (y + 1)
 
-  
 lfsr_ :: Int -> Word8 -> Bool
 lfsr_ 0 state = state .&. 0x01 == 1
 lfsr_ c state =
@@ -106,10 +104,10 @@ mkRC_ rd rc = go 0 rd rc
       | otherwise =
         let rc' =
               if rc_ (j + (7 * r))
-                then rc .|. (1 `shiftL` ((1 `shiftL`j) - 1))
+                then rc .|. (1 `shiftL` ((1 `shiftL` j) - 1))
                 else rc
          in go (j + 1) r rc'
-  
+
 iota :: Int -> [[Word64]] -> [[Word64]]
 iota round ((i:inner):outer) = (i `xor` mkRC_ round 0 : inner) : outer
 iota _ _ = unreachable
@@ -183,19 +181,25 @@ fromWord64 = concatMap f
 -- apply the block hash iteratively to an arbitrarily long string.
 --
 -- N is our input string, and d is the length of the output hash.
-sponge :: ([Word64] -> [Word64]) -> (Int -> Int -> [Word8]) -> Int -> [Word8] -> Int -> [Word64]
-sponge f pad r n d =
+sponge ::
+     ([Word64] -> [Word64])
+  -> (Int -> Int -> [Word8])
+  -> Int
+  -> [Word8]
+  -> Int
+  -> [Word64]
+sponge f pad r n d
       -- rate and capacity adjusted for quadwords. Recall that 1600
       -- bits is derived from 5x5x64 (5x5 quadwords).
+ =
   let qwr = r `div` 8
       qwc = 25 - qwr
       a = absorb qwr qwc (replicate 25 0) (toWord64 (n ++ pad r (length n)))
-   in squeeze qwr a d (take r a)
+   in squeeze qwr a d (take qwr a)
   where
     absorb _ _ state [] = state
     absorb qwr qwc state n' =
-      let state' =
-            zipWith xor state (f (take qwr n' ++ replicate qwc 0))
+      let state' = zipWith xor state (f (take qwr n' ++ replicate qwc 0))
        in absorb r qwc state' (drop qwr n')
     squeeze qwr st outl z
       | outl <= length z = take outl z
@@ -203,10 +207,10 @@ sponge f pad r n d =
         let st' = f st
          in squeeze qwr st' outl (z ++ take qwr st')
 
-pad101 :: Int -> Int -> [Word8]
-pad101 x m =
+pad101 :: Word8 -> Int -> Int -> [Word8]
+pad101 dom x m =
   let pad = (x - (m `mod` x))
-   in [0x80] ++ replicate (pad - 2) 0 ++ [0x1]
+   in [dom] ++ replicate (pad - 2) 0 ++ [0x80]
 
 -- KECCAK is specified with bits in mind, but in the real world we
 -- have to work with bytes. I'm torn here on how to write down its
@@ -216,11 +220,12 @@ pad101 x m =
 -- SHA3 functions.
 --
 -- SO KEEP IN MIND THEN, that c is IN BITS.
-keccak :: Int -> [Word8] -> Int -> [Word64]
-keccak c n d = sponge keccakP pad101 ((1600 - c) `div` 8) n (d `div` 8)
+keccak :: Word8 -> Int -> [Word8] -> Int -> [Word64]
+keccak dom c n d =
+  sponge keccakP (pad101 dom) ((1600 - c) `div` 8) n (d `div` 8)
 
 sha3 :: [Word8] -> Int -> Int -> [Word64]
-sha3 m c = keccak c (m ++ [0x01])
+sha3 m c = keccak 0x06 c m
 
 sha3_512 :: [Word8] -> [Word64]
 sha3_512 m = sha3 m 1024 512
