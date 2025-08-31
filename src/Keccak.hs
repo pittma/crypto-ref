@@ -50,7 +50,7 @@ coordsToOffsets_ = 0 : map snd (sortOn fst (map swap (gen (1, 0) 0)))
     swap ((x, y), o) = ((y, x), o)
 
 rho :: [[Word64]] -> [[Word64]]
-rho state = matrify_ $ zipWith rotateL (concat state) (coordsToOffsets_)
+rho state = toStateMtx $ zipWith rotateL (concat state) coordsToOffsets_
 
 pi :: [[Word64]] -> [[Word64]]
 pi [] = []
@@ -58,11 +58,11 @@ pi state = go 0
   where
     go 5 = []
     go i =
-      [ state !! 0 !! (mkX 0 i)
-      , state !! 1 !! (mkX 1 i)
-      , state !! 2 !! (mkX 2 i)
-      , state !! 3 !! (mkX 3 i)
-      , state !! 4 !! (mkX 4 i)
+      [ state !! 0 !! mkX 0 i
+      , state !! 1 !! mkX 1 i
+      , state !! 2 !! mkX 2 i
+      , state !! 3 !! mkX 3 i
+      , state !! 4 !! mkX 4 i
       ]
         : go (i + 1)
     mkX x y = (x + (3 * y)) `mod` 5
@@ -97,16 +97,16 @@ rc_ count
   | otherwise = lfsr_ count 1
 
 mkRC_ :: Int -> Word64 -> Word64
-mkRC_ rd rc = go 0 rd rc
+mkRC_ = go 0
   where
-    go j r rc
-      | j == 7 = rc
+    go j r rc'
+      | j == 7 = rc'
       | otherwise =
-        let rc' =
+        let rc'' =
               if rc_ (j + (7 * r))
-                then rc .|. (1 `shiftL` ((1 `shiftL` j) - 1))
-                else rc
-         in go (j + 1) r rc'
+                then rc' .|. (1 `shiftL` ((1 `shiftL` j) - 1))
+                else rc'
+         in go (j + 1) r rc''
 
 iota :: Int -> [[Word64]] -> [[Word64]]
 iota round ((i:inner):outer) = (i `xor` mkRC_ round 0 : inner) : outer
@@ -115,15 +115,10 @@ iota _ _ = unreachable
 rnd :: Int -> [[Word64]] -> [[Word64]]
 rnd i = iota i . chi . pi . rho . theta
 
-matrify_ :: [w] -> [[w]]
-matrify_ s = go s
-  where
-    go [] = []
-    go (s1:s2:s3:s4:s5:ss) = [s1, s2, s3, s4, s5] : go ss
-    go _ = unreachable
-
-unmatrify_ :: [[Word64]] -> [Word64]
-unmatrify_ s = concat (s)
+toStateMtx :: [Word64] -> [[Word64]]
+toStateMtx [] = []
+toStateMtx (s1:s2:s3:s4:s5:ss) = [s1, s2, s3, s4, s5] : toStateMtx ss
+toStateMtx _ = unreachable
 
 -- KECCAK-p as specified is a family of functions KECCAK-p[b, nr](S)
 -- where nr is number of rounds and b is the but length of the output
@@ -134,7 +129,7 @@ unmatrify_ s = concat (s)
 -- b as parameters leaving its only input to be S, the string to be
 -- hashed.
 keccakP :: [Word64] -> [Word64]
-keccakP input = unmatrify_ $ run 0 (matrify_ input)
+keccakP input = concat $ run 0 (toStateMtx input)
   where
     run r s
       | r == 23 = rnd r s
@@ -229,3 +224,12 @@ sha3 m c d = toString $ fromWord64 (keccak 0x06 c m d)
 
 sha3_512 :: [Word8] -> String
 sha3_512 m = sha3 m 1024 512
+
+shake :: [Word8] -> Int -> Int -> String
+shake m c d = toString $ fromWord64 (keccak 0x1f c m d)
+
+shake128 :: [Word8] -> Int -> String
+shake128 m = shake m 256
+
+shake256 :: [Word8] -> Int -> String
+shake256 m = shake m 512
