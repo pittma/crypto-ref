@@ -167,6 +167,40 @@ fromWord64 = concatMap f
         , word `shiftR` 56
         ]
 
+-- absorb implements the absorb phase of a sponge. It IS NOT
+-- streaming; when called, the input bytes n' should already be
+-- padded. It handles rate/capacity, but not initial padding.
+absorb ::
+     ([Word64] -> [Word64]) -> Int -> Int -> [Word64] -> [Word64] -> [Word64]
+absorb _ _ _ state [] = state
+absorb f qwr qwc state n' =
+  let state' = f (zipWith xor state (take qwr n' ++ replicate qwc 0))
+   in absorb f qwr qwc state' (drop qwr n')
+  
+-- squeeze' is an implementation of squeeze that can be streamed by
+-- returning both the updated state and the output bytes. It should
+-- only be called with a state matrix which is fully padded and
+-- absorbed.
+squeeze' ::
+     ([Word64] -> [Word64])
+  -> Int
+  -> [Word64]
+  -> Int
+  -> [Word64]
+  -> ([Word64], [Word64])
+squeeze' f qwr st outl z
+  | outl <= length z = (take outl z, st)
+  | otherwise =
+    let st' = f st
+     in squeeze' f qwr st' outl (z ++ take qwr st')
+
+squeeze ::
+     ([Word64] -> [Word64]) -> Int -> [Word64] -> Int -> [Word64] -> [Word64]
+squeeze f qwr st outl z = fst $ squeeze' f qwr st outl z
+
+xofInit :: (Int -> Int -> [Word8]) -> [Word64] -> ([Word64], [Word64])
+xofInit = unreachable
+
 -- A sponge is a family of functions SPONGE[f, pad, r](N, d) s.t. f is
 -- the mixing function. pad is the padding function, and r is the
 -- rate. See the spec for more on r.
@@ -189,18 +223,8 @@ sponge f pad r n d
  =
   let qwr = r `div` 8
       qwc = 25 - qwr
-      a = absorb qwr qwc (replicate 25 0) (toWord64 (n ++ pad r (length n)))
-   in squeeze qwr a (d `div` 8) (take qwr a)
-  where
-    absorb _ _ state [] = state
-    absorb qwr qwc state n' =
-      let state' = f (zipWith xor state (take qwr n' ++ replicate qwc 0))
-       in absorb r qwc state' (drop qwr n')
-    squeeze qwr st outl z
-      | outl <= length z = take outl z
-      | otherwise =
-        let st' = f st
-         in squeeze qwr st' outl (z ++ take qwr st')
+      a = absorb f qwr qwc (replicate 25 0) (toWord64 (n ++ pad r (length n)))
+   in fst $ squeeze' f qwr a (d `div` 8) (take qwr a)
 
 pad101 :: Word8 -> Int -> Int -> [Word8]
 pad101 dom x m =
@@ -219,17 +243,17 @@ keccak :: Word8 -> Int -> [Word8] -> Int -> [Word64]
 keccak dom c n d =
   sponge keccakP (pad101 dom) ((1600 - c) `div` 8) n (d `div` 8)
 
-sha3 :: [Word8] -> Int -> Int -> String
-sha3 m c d = toString $ fromWord64 (keccak 0x06 c m d)
+sha3 :: [Word8] -> Int -> Int -> [Word8]
+sha3 m c d = fromWord64 (keccak 0x06 c m d)
 
-sha3_512 :: [Word8] -> String
+sha3_512 :: [Word8] -> [Word8]
 sha3_512 m = sha3 m 1024 512
 
-shake :: [Word8] -> Int -> Int -> String
-shake m c d = toString $ fromWord64 (keccak 0x1f c m d)
+shake :: [Word8] -> Int -> Int -> [Word8]
+shake m c d = fromWord64 (keccak 0x1f c m d)
 
-shake128 :: [Word8] -> Int -> String
+shake128 :: [Word8] -> Int -> [Word8]
 shake128 m = shake m 256
 
-shake256 :: [Word8] -> Int -> String
+shake256 :: [Word8] -> Int -> [Word8]
 shake256 m = shake m 512

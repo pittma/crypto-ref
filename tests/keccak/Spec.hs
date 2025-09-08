@@ -3,6 +3,7 @@ module Main where
 import Data.Word
 
 import Keccak
+import Util (toString)
 
 import Test.Hspec
 
@@ -78,4 +79,4 @@ main =
         keccakP (replicate 25 0) `shouldBe` theZeroVectorHash
     describe "SHA3-512" $ do
       it "should return the empty message hash for the empty message" $ do
-        sha3_512 [] `shouldBe` sha512EmptyMsgHash
+        toString (sha3_512 []) `shouldBe` sha512EmptyMsgHash
