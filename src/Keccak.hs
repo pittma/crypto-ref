@@ -8,8 +8,9 @@ import Data.Word
 
 import Util
 
--- | XOR sheets, where a sheet is the nth item in each inner
--- | array.
+{- | XOR sheets, where a sheet is the nth item in each inner
+| array.
+-}
 theta1_ :: [[Word64]] -> [Word64]
 theta1_ state
   | length state /= 5 = unreachable
@@ -21,15 +22,16 @@ theta2_ :: [Word64] -> [Word64]
 theta2_ cols
   | length cols /= 5 = unreachable
   | otherwise = go cols 0
-  where
-    go _ 5 = []
-    go c i =
-      let idx1 = (i - 1) `mod` 5
-          idx2 = (i + 1) `mod` 5
-       in ((c !! idx1) `xor` (c !! idx2 `rotateL` 1)) : go c (i + 1)
+ where
+  go _ 5 = []
+  go c i =
+    let idx1 = (i - 1) `mod` 5
+        idx2 = (i + 1) `mod` 5
+     in ((c !! idx1) `xor` (c !! idx2 `rotateL` 1)) : go c (i + 1)
 
--- | XOR each inner-array element with the columns we've been working
--- | on.
+{- | XOR each inner-array element with the columns we've been working
+| on.
+-}
 theta3_ :: [[Word64]] -> [Word64] -> [[Word64]]
 theta3_ is cols = map (zipWith xor cols) is
 
@@ -44,10 +46,10 @@ coords_ x y = (y, ((2 * x) + (3 * y)) `mod` 5)
 
 coordsToOffsets_ :: [Int]
 coordsToOffsets_ = 0 : map snd (sortOn fst (map swap (gen (1, 0) 0)))
-  where
-    gen _ 24 = []
-    gen (x, y) i = ((x, y), offset_ i) : gen (coords_ x y) (i + 1)
-    swap ((x, y), o) = ((y, x), o)
+ where
+  gen _ 24 = []
+  gen (x, y) i = ((x, y), offset_ i) : gen (coords_ x y) (i + 1)
+  swap ((x, y), o) = ((y, x), o)
 
 rho :: [[Word64]] -> [[Word64]]
 rho state = toStateMtx $ zipWith rotateL (concat state) coordsToOffsets_
@@ -55,17 +57,17 @@ rho state = toStateMtx $ zipWith rotateL (concat state) coordsToOffsets_
 pi :: [[Word64]] -> [[Word64]]
 pi [] = []
 pi state = go 0
-  where
-    go 5 = []
-    go i =
-      [ state !! 0 !! mkX 0 i
-      , state !! 1 !! mkX 1 i
-      , state !! 2 !! mkX 2 i
-      , state !! 3 !! mkX 3 i
-      , state !! 4 !! mkX 4 i
-      ]
-        : go (i + 1)
-    mkX x y = (x + (3 * y)) `mod` 5
+ where
+  go 5 = []
+  go i =
+    [ state !! 0 !! mkX 0 i
+    , state !! 1 !! mkX 1 i
+    , state !! 2 !! mkX 2 i
+    , state !! 3 !! mkX 3 i
+    , state !! 4 !! mkX 4 i
+    ]
+      : go (i + 1)
+  mkX x y = (x + (3 * y)) `mod` 5
 
 chiTrans_ :: [[Word64]] -> Int -> Int -> Word64
 chiTrans_ state x y =
@@ -76,11 +78,11 @@ chiTrans_ state x y =
 
 chi :: [[Word64]] -> [[Word64]]
 chi state = outer state 0
-  where
-    outer _ 5 = []
-    outer st x = inner st x 0 : outer st (x + 1)
-    inner _ _ 5 = []
-    inner st' x y = chiTrans_ st' y x : inner st' x (y + 1)
+ where
+  outer _ 5 = []
+  outer st x = inner st x 0 : outer st (x + 1)
+  inner _ _ 5 = []
+  inner st' x y = chiTrans_ st' y x : inner st' x (y + 1)
 
 lfsr_ :: Int -> Word8 -> Bool
 lfsr_ 0 state = state .&. 0x01 == 1
@@ -98,10 +100,10 @@ rc_ count
 
 mkRC_ :: Int -> Word64 -> Word64
 mkRC_ = go 0
-  where
-    go j r rc'
-      | j == 7 = rc'
-      | otherwise =
+ where
+  go j r rc'
+    | j == 7 = rc'
+    | otherwise =
         let rc'' =
               if rc_ (j + (7 * r))
                 then rc' .|. (1 `shiftL` ((1 `shiftL` j) - 1))
@@ -109,7 +111,7 @@ mkRC_ = go 0
          in go (j + 1) r rc''
 
 iota :: Int -> [[Word64]] -> [[Word64]]
-iota round ((i:inner):outer) = (i `xor` mkRC_ round 0 : inner) : outer
+iota round ((i : inner) : outer) = (i `xor` mkRC_ round 0 : inner) : outer
 iota _ _ = unreachable
 
 rnd :: Int -> [[Word64]] -> [[Word64]]
@@ -117,7 +119,7 @@ rnd i = iota i . chi . pi . rho . theta
 
 toStateMtx :: [Word64] -> [[Word64]]
 toStateMtx [] = []
-toStateMtx (s1:s2:s3:s4:s5:ss) = [s1, s2, s3, s4, s5] : toStateMtx ss
+toStateMtx (s1 : s2 : s3 : s4 : s5 : ss) = [s1, s2, s3, s4, s5] : toStateMtx ss
 toStateMtx _ = unreachable
 
 -- KECCAK-p as specified is a family of functions KECCAK-p[b, nr](S)
@@ -130,59 +132,60 @@ toStateMtx _ = unreachable
 -- hashed.
 keccakP :: [Word64] -> [Word64]
 keccakP input = concat $ run 0 (toStateMtx input)
-  where
-    run r s
-      | r == 23 = rnd r s
-      | otherwise = run (r + 1) (rnd r s)
+ where
+  run r s
+    | r == 23 = rnd r s
+    | otherwise = run (r + 1) (rnd r s)
 
 toWord64 :: [Word8] -> [Word64]
 toWord64 bytes = go (map fromIntegral bytes)
-  where
-    go (w1:w2:w3:w4:w5:w6:w7:w8:rest) =
-      (w8 `shiftL` 56
-         .|. w7 `shiftL` 48
-         .|. w6 `shiftL` 40
-         .|. w5 `shiftL` 32
-         .|. w4 `shiftL` 24
-         .|. w3 `shiftL` 16
-         .|. w2 `shiftL` 8
-         .|. w1)
-        : go rest
-    go [] = []
-    go _ = unreachable
+ where
+  go (w1 : w2 : w3 : w4 : w5 : w6 : w7 : w8 : rest) =
+    ( w8 `shiftL` 56
+        .|. w7 `shiftL` 48
+        .|. w6 `shiftL` 40
+        .|. w5 `shiftL` 32
+        .|. w4 `shiftL` 24
+        .|. w3 `shiftL` 16
+        .|. w2 `shiftL` 8
+        .|. w1
+    )
+      : go rest
+  go [] = []
+  go _ = unreachable
 
 fromWord64 :: [Word64] -> [Word8]
 fromWord64 = concatMap f
-  where
-    f word =
-      map
-        fromIntegral
-        [ word
-        , word `shiftR` 8
-        , word `shiftR` 16
-        , word `shiftR` 24
-        , word `shiftR` 32
-        , word `shiftR` 40
-        , word `shiftR` 48
-        , word `shiftR` 56
-        ]
+ where
+  f word =
+    map
+      fromIntegral
+      [ word
+      , word `shiftR` 8
+      , word `shiftR` 16
+      , word `shiftR` 24
+      , word `shiftR` 32
+      , word `shiftR` 40
+      , word `shiftR` 48
+      , word `shiftR` 56
+      ]
 
 -- absorb implements the absorb phase of a sponge. It IS NOT
 -- streaming; when called, the input bytes n' should already be
 -- padded. It handles rate/capacity, but not initial padding.
-absorb ::
-     ([Word64] -> [Word64]) -> Int -> Int -> [Word64] -> [Word64] -> [Word64]
+absorb
+  :: ([Word64] -> [Word64]) -> Int -> Int -> [Word64] -> [Word64] -> [Word64]
 absorb _ _ _ state [] = state
 absorb f qwr qwc state n' =
   let state' = f (zipWith xor state (take qwr n' ++ replicate qwc 0))
    in absorb f qwr qwc state' (drop qwr n')
-  
+
 -- squeeze' is an implementation of squeeze that can be streamed by
 -- returning both the updated state and the output bytes. It should
 -- only be called with a state matrix which is fully padded and
 -- absorbed.
-squeeze' ::
-     ([Word64] -> [Word64])
+squeeze'
+  :: ([Word64] -> [Word64])
   -> Int
   -> [Word64]
   -> Int
@@ -191,11 +194,11 @@ squeeze' ::
 squeeze' f qwr st outl z
   | outl <= length z = (take outl z, st)
   | otherwise =
-    let st' = f st
-     in squeeze' f qwr st' outl (z ++ take qwr st')
+      let st' = f st
+       in squeeze' f qwr st' outl (z ++ take qwr st')
 
-squeeze ::
-     ([Word64] -> [Word64]) -> Int -> [Word64] -> Int -> [Word64] -> [Word64]
+squeeze
+  :: ([Word64] -> [Word64]) -> Int -> [Word64] -> Int -> [Word64] -> [Word64]
 squeeze f qwr st outl z = fst $ squeeze' f qwr st outl z
 
 xofInit :: (Int -> Int -> [Word8]) -> [Word64] -> ([Word64], [Word64])
@@ -210,17 +213,16 @@ xofInit = unreachable
 -- apply the block hash iteratively to an arbitrarily long string.
 --
 -- N is our input string, and d is the length of the output hash.
-sponge ::
-     ([Word64] -> [Word64])
+sponge
+  :: ([Word64] -> [Word64])
   -> (Int -> Int -> [Word8])
   -> Int
   -> [Word8]
   -> Int
   -> [Word64]
-sponge f pad r n d
-      -- rate and capacity adjusted for quadwords. Recall that 1600
-      -- bits is derived from 5x5x64 (5x5 quadwords).
- =
+sponge f pad r n d =
+  -- rate and capacity adjusted for quadwords. Recall that 1600
+  -- bits is derived from 5x5x64 (5x5 quadwords).
   let qwr = r `div` 8
       qwc = 25 - qwr
       a = absorb f qwr qwc (replicate 25 0) (toWord64 (n ++ pad r (length n)))
