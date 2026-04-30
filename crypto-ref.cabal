@@ -1,58 +1,64 @@
-cabal-version:      3.0
-name:               crypto-ref
-version:            0.1.0.0
-synopsis:           Reference implementations of various cryptography algorithms
+cabal-version: 3.0
+name: crypto-ref
+version: 0.1.0.0
+synopsis: Reference implementations of various cryptography algorithms
 -- description:
-license:            MIT
-license-file:       LICENSE
-author:             Dan Pittman
-maintainer:         dan@dpitt.me
+license: MIT
+license-file: LICENSE
+author: Dan Pittman
+maintainer: dan@dpitt.me
 -- copyright:
-build-type:         Simple
+build-type: Simple
+
 -- extra-doc-files:
 -- extra-source-files:
-
 common warnings
-    ghc-options: -Wall
+  ghc-options: -Wall
 
 library
-    import:           warnings
-    exposed-modules:
-        AES
-        AES.Encrypt
-        AES.Decrypt
-        CFB
-        GF
-        Util
-        XTS
-        Keccak
-        Kyber
-    other-modules:
-        AES.Shared
-    -- other-extensions:
-    build-depends:
-        base ^>=4.18.3,
-        cryptonite,
-        utf8-string,
-        memory
-    hs-source-dirs:   src
-    default-language: Haskell2010
+  import: warnings
+  exposed-modules:
+    AES
+    AES.Decrypt
+    AES.Encrypt
+    CFB
+    GCM
+    GF
+    Keccak
+    Util
+    XTS
 
+  other-modules:
+    AES.Shared
+
+  -- other-extensions:
+  build-depends:
+    base ^>=4.18.3,
+    cryptonite,
+    memory,
+    utf8-string,
+
+  hs-source-dirs: src
+  default-language: Haskell2010
 
 test-suite xts
-  type:                exitcode-stdio-1.0
-  hs-source-dirs:      tests/xts
-  main-is:             Spec.hs
-  build-depends:       base ^>=4.18.3,
-                       crypto-ref,
-                       hspec >=2.7,
-  default-language:    Haskell2010
+  type: exitcode-stdio-1.0
+  hs-source-dirs: tests/xts
+  main-is: Spec.hs
+  build-depends:
+    base ^>=4.18.3,
+    crypto-ref,
+    hspec >=2.7,
+
+  default-language: Haskell2010
 
 test-suite keccak
-  type:                exitcode-stdio-1.0
-  hs-source-dirs:      tests/keccak
-  main-is:             Spec.hs
-  build-depends:       base ^>=4.18.3,
-                       crypto-ref,
-                       hspec >=2.7,
-  default-language:    Haskell2010
+  type: exitcode-stdio-1.0
+  hs-source-dirs: tests/keccak
+  main-is: Spec.hs
+  build-depends:
+    base ^>=4.18.3,
+    crypto-ref,
+    hspec >=2.7,
+
+  default-language: Haskell2010
