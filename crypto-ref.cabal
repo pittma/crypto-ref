@@ -61,4 +61,13 @@ test-suite keccak
     crypto-ref,
     hspec >=2.7,
 
+test-suite gcm
+  type: exitcode-stdio-1.0
+  hs-source-dirs: tests/gcm
+  main-is: Spec.hs
+  build-depends:
+    base ^>=4.18.3,
+    crypto-ref,
+    hspec >=2.7,
+
   default-language: Haskell2010

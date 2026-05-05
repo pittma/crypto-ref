@@ -1,22 +1,23 @@
 {-# LANGUAGE RankNTypes #-}
+
 module Util where
 
-import GHC.Stack.Types (HasCallStack)
-import Data.Bits ( Bits((.|.), shiftL, shiftR) )
-import Text.Printf (PrintfArg, printf)
-import Data.Word ( Word8, Word32 )
+import Data.Bits (Bits (shiftL, shiftR, (.|.)))
+import Data.Word (Word32, Word8)
 import Debug.Trace
+import GHC.Stack.Types (HasCallStack)
+import Text.Printf (PrintfArg, printf)
 
-unreachable :: forall a. HasCallStack  =>  a
+unreachable :: forall a. (HasCallStack) => a
 unreachable = error "unreachable"
 
 bytesToWord :: [Word8] -> Word32
 bytesToWord x
-  | length x == 4 = f (map fromIntegral x)
-  | otherwise = 0
+    | length x == 4 = f (map fromIntegral x)
+    | otherwise = 0
   where
     f [a, b, c, d] =
-      (a `shiftL` 24) .|. (b `shiftL` 16) .|. (c `shiftL` 8) .|. d
+        (a `shiftL` 24) .|. (b `shiftL` 16) .|. (c `shiftL` 8) .|. d
     f _ = unreachable
 
 wordToBytes :: Word32 -> [Word8]
@@ -27,9 +28,9 @@ matrify x = map bytesToWord $ transpose $ map wordToBytes x
 
 transpose :: [[a]] -> [[a]]
 transpose [] = []
-transpose ([]:xss) = transpose xss
-transpose ((x:xs):xss) =
-  (x : [hds | (hds:_) <- xss]) : transpose (xs : [tls | (_:tls) <- xss])
+transpose ([] : xss) = transpose xss
+transpose ((x : xs) : xss) =
+    (x : [hds | (hds : _) <- xss]) : transpose (xs : [tls | (_ : tls) <- xss])
 
 printHex :: (PrintfArg p) => p -> String
 printHex = printf "0x%08x"
@@ -41,7 +42,7 @@ showState :: [Word32] -> String
 showState state = toString $ concatMap wordToBytes (matrify state)
 
 toBytes :: String -> [Word8]
-toBytes (a:b:r) = read ("0x" ++ [a, b]) : toBytes r
+toBytes (a : b : r) = read ("0x" ++ [a, b]) : toBytes r
 toBytes [] = []
 toBytes [_] = unreachable
 
@@ -51,6 +52,9 @@ toString = concatMap (printf "%02x")
 wordify :: String -> [Word32]
 wordify [] = []
 wordify s
-  | length s `mod` 8 == 0 =
-    bytesToWord (toBytes (take 8 s)) : wordify (drop 8 s)
-  | otherwise = unreachable
+    | length s `mod` 8 == 0 =
+        bytesToWord (toBytes (take 8 s)) : wordify (drop 8 s)
+    | otherwise = unreachable
+
+stringify :: [Word32] -> String
+stringify x = toString $ concatMap wordToBytes x
