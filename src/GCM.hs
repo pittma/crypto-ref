@@ -1,7 +1,7 @@
 module GCM where
 
 import Data.Bits
-import Data.Word (Word32)
+import Data.Word (Word32, Word64)
 
 import qualified AES.Encrypt as AE
 import qualified AES.Shared as AS
@@ -13,7 +13,11 @@ clshr128 [x1, x2, x3, x4] =
         (y2, c2) = shrwcarry x2
         (y3, c3) = shrwcarry x3
         (y4, c4) = shrwcarry x4
-     in [if c4 == (1 `shiftL` 31) then y1 `xor` (0xe1 `shiftL` 24) else y1, carrybit y2 c1, carrybit y3 c2, carrybit y4 c3]
+     in [ if c4 == (1 `shiftL` 31) then y1 `xor` (0xe1 `shiftL` 24) else y1
+        , carrybit y2 c1
+        , carrybit y3 c2
+        , carrybit y4 c3
+        ]
   where
     shrwcarry z = (z `shiftR` 1, z `shiftL` 31)
     carrybit y c = y .|. c
@@ -48,8 +52,19 @@ expandInc ys i = concat $ drop 1 $ take (i + 1) $ iterate f ys
     f [x1, x2, x3, x4] = [x1, x2, x3, x4 + 1]
     f _ = unreachable
 
-encrypt_ :: Int -> [Word32] -> [Word32] -> [Word32] -> ([Word32], [Word32])
-encrypt_ rnds key initVec plaintext =
+splitQWord :: Word64 -> [Word32]
+splitQWord x = [fromIntegral (x `shiftR` 32), fromIntegral x]
+
+padToBlock :: [Word32] -> [Word32]
+padToBlock x =
+    let xlm = length x `mod` 4
+     in if xlm /= 0
+            then
+                x ++ replicate (4 - xlm) 0
+            else x
+
+encrypt_ :: Int -> [Word32] -> [Word32] -> [Word32] -> [Word32] -> ([Word32], [Word32])
+encrypt_ rnds key initVec plaintext aad =
     let ekey = AS.expandKey key
         h = AE.encrypt_ rnds [0, 0, 0, 0] ekey
         y0 = initVec ++ [1]
@@ -70,9 +85,12 @@ encrypt_ rnds key initVec plaintext =
                         (drop (wbl * 4) plaintext)
                         (take tl (AE.encrypt_ rnds (drop (wbl * 4) ys) ekey))
         ccomp = c ++ cstar
-        clen = (length ccomp) * 4 * 8
-        tmpclenvecTODO = [0, 0, 0, fromIntegral clen]
-     in (ccomp, zipWith xor (ghash (c ++ tmpclenvecTODO) h) (AE.encrypt_ rnds y0 ekey))
+     in ( ccomp
+        , zipWith
+            xor
+            (ghash (padToBlock aad ++ padToBlock ccomp ++ mkLenVec aad ++ mkLenVec ccomp) h)
+            (AE.encrypt_ rnds y0 ekey)
+        )
   where
     go _ [] _ = []
     go k pt ys =
@@ -81,6 +99,7 @@ encrypt_ rnds key initVec plaintext =
             (take 4 pt)
             (AE.encrypt_ rnds (take 4 ys) k)
             ++ go k (drop 4 pt) (drop 4 ys)
+    mkLenVec x = splitQWord $ fromIntegral $ length x * 4 * 8
 
-encrypt128 :: [Word32] -> [Word32] -> [Word32] -> ([Word32], [Word32])
+encrypt128 :: [Word32] -> [Word32] -> [Word32] -> [Word32] -> ([Word32], [Word32])
 encrypt128 = encrypt_ 10
