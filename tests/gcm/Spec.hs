@@ -7,7 +7,7 @@ import Util
 
 import GCM
 
-data EncryptCase = ECase
+data Case = ECase
     { pt :: String
     , iv :: String
     , key :: String
@@ -16,8 +16,8 @@ data EncryptCase = ECase
     , aad :: String
     }
 
-encryptCases :: [EncryptCase]
-encryptCases =
+cases :: [Case]
+cases =
     [ ECase
         { pt = []
         , iv = "000000000000000000000000"
@@ -57,10 +57,21 @@ main =
     hspec $ do
         describe "GCM encrypt" $ do
             it "should correctly encrypt the test vectors from the standard" $ do
-                forM_ encryptCases encTest
+                forM_ cases encTest
+            it "should return the original plaintext from the test vectors" $ do
+                forM_ cases decTest
   where
-    encTest :: EncryptCase -> IO ()
+    encTest :: Case -> IO ()
     encTest c = do
         let out = encrypt128 (wordify (key c)) (wordify (iv c)) (wordify (pt c)) (wordify (aad c))
         stringify (fst out) `shouldBe` (ct c)
         stringify (snd out) `shouldBe` (tag c)
+    decTest c = do
+        let out =
+                decrypt128
+                    (wordify (key c))
+                    (wordify (iv c))
+                    (wordify (ct c))
+                    (wordify (tag c))
+                    (wordify (aad c))
+        fmap stringify out `shouldBe` Just (pt c)

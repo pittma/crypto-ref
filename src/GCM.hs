@@ -47,7 +47,11 @@ ghash input hashkey
     go x y h = go (drop 4 x) (clmul128 (zipWith xor (take 4 x) y) h) h
 
 expandInc :: [Word32] -> Int -> [Word32]
-expandInc ys i = concat $ drop 1 $ take (i + 1) $ iterate f ys
+expandInc iv len =
+    -- +2 or +1 here because we're always going to be +1 after dropping the
+    -- initial value, +2 accounts for the incomplete tail block.
+    let cnt = if len `mod` 4 /= 0 then (len `div` 4) + 2 else len + 1
+     in concat $ drop 1 $ take cnt $ iterate f iv
   where
     f [x1, x2, x3, x4] = [x1, x2, x3, x4 + 1]
     f _ = unreachable
@@ -63,43 +67,73 @@ padToBlock x =
                 x ++ replicate (4 - xlm) 0
             else x
 
+handleWholeBlocks ::
+    ([Word32] -> [Word32] -> [Word32]) ->
+    [Word32] ->
+    [Word32] ->
+    [Word32] ->
+    [Word32]
+handleWholeBlocks _ _ [] _ = []
+handleWholeBlocks f k d ys =
+    zipWith
+        xor
+        (take 4 d)
+        (f (take 4 ys) k)
+        ++ handleWholeBlocks f k (drop 4 d) (drop 4 ys)
+
+handleTail ::
+    ([Word32] -> [Word32] -> [Word32]) ->
+    Int ->
+    [Word32] ->
+    [Word32] ->
+    [Word32] ->
+    [Word32]
+handleTail f tl d y k = zipWith xor d (take tl (f y k))
+
+transform :: ([Word32] -> [Word32] -> [Word32]) -> [Word32] -> [Word32] -> [Word32] -> [Word32]
+transform f k d iv =
+    let dataLen = length d
+        tl = dataLen `mod` 4
+        wbl = dataLen `div` 4
+        ys = expandInc iv dataLen
+        t = drop (wbl * 4) d
+        y = drop (wbl * 4) ys
+     in handleWholeBlocks f k (take (wbl * 4) d) ys ++ handleTail f tl t y k
+
+mkLenVec :: [Word32] -> [Word32]
+mkLenVec x = splitQWord $ fromIntegral $ length x * 4 * 8
+
 encrypt_ :: Int -> [Word32] -> [Word32] -> [Word32] -> [Word32] -> ([Word32], [Word32])
 encrypt_ rnds key initVec plaintext aad =
     let ekey = AS.expandKey key
         h = AE.encrypt_ rnds [0, 0, 0, 0] ekey
         y0 = initVec ++ [1]
-        ptl = length plaintext
-        wbl = ptl `div` 4
-        tl = ptl `mod` 4
-        ys =
-            if tl == 0
-                then expandInc y0 wbl
-                else expandInc y0 (wbl + 1)
-        c = go ekey (take (4 * wbl) plaintext) ys
-        cstar =
-            if tl == 0
-                then []
-                else
-                    zipWith
-                        xor
-                        (drop (wbl * 4) plaintext)
-                        (take tl (AE.encrypt_ rnds (drop (wbl * 4) ys) ekey))
-        ccomp = c ++ cstar
-     in ( ccomp
+        c = transform (AE.encrypt_ rnds) ekey plaintext y0
+     in ( c
         , zipWith
             xor
-            (ghash (padToBlock aad ++ padToBlock ccomp ++ mkLenVec aad ++ mkLenVec ccomp) h)
+            (ghash (padToBlock aad ++ padToBlock c ++ mkLenVec aad ++ mkLenVec c) h)
             (AE.encrypt_ rnds y0 ekey)
         )
-  where
-    go _ [] _ = []
-    go k pt ys =
-        zipWith
-            xor
-            (take 4 pt)
-            (AE.encrypt_ rnds (take 4 ys) k)
-            ++ go k (drop 4 pt) (drop 4 ys)
-    mkLenVec x = splitQWord $ fromIntegral $ length x * 4 * 8
 
 encrypt128 :: [Word32] -> [Word32] -> [Word32] -> [Word32] -> ([Word32], [Word32])
 encrypt128 = encrypt_ 10
+
+decrypt_ :: Int -> [Word32] -> [Word32] -> [Word32] -> [Word32] -> [Word32] -> Maybe [Word32]
+decrypt_ rnds key initVec ct tag aad =
+    let ekey = AS.expandKey key
+        h = AE.encrypt_ rnds [0, 0, 0, 0] ekey
+        y0 = initVec ++ [1]
+        t =
+            zipWith
+                xor
+                (ghash (padToBlock aad ++ padToBlock ct ++ mkLenVec aad ++ mkLenVec ct) h)
+                (AE.encrypt_ rnds y0 ekey)
+     in if t /= tag
+            then
+                Nothing
+            else
+                Just $ transform (AE.encrypt_ rnds) ekey ct y0
+
+decrypt128 :: [Word32] -> [Word32] -> [Word32] -> [Word32] -> [Word32] -> Maybe [Word32]
+decrypt128 = decrypt_ 10
